@@ -1,0 +1,301 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © krajeshj
+// This is the most recent change as of 1/05/2022
+// KRJ VER 3 : WORK THIS 
+//@version=5
+//strategy("My Strategy", overlay=true, margin_long=100, margin_short=100)
+//
+//longCondition = ta.crossover(ta.sma(close, 14), ta.sma(close, 28))
+//if (longCondition)
+//    strategy.entry("My Long Entry Id", strategy.long)
+
+//shortCondition = ta.crossunder(ta.sma(close, 14), ta.sma(close, 28))
+//if (shortCondition)
+//    strategy.entry("My Short Entry Id", strategy.short)
+//    */
+//@version=5
+strategy(title = "KRJ Swing HMA Volume Sar HA", overlay = true,  pyramiding=1,initial_capital = 100, default_qty_type= strategy.percent_of_equity, default_qty_value = 100, calc_on_order_fills=false, slippage=0,commission_type=strategy.commission.percent,commission_value=0.1)
+longEntry=input.bool(true,title="Allow Long entries?", group="Entry Type") 
+shortEntry=input.bool(false,title="Allow Short entries", group="Entry Type") 
+
+//uo
+var cumVolx = 0.
+cumVolx += nz(volume)
+if barstate.islast and cumVolx == 0
+    runtime.error("No volume is provided by the data vendor.")
+shortlen = input.int(5, minval=1, title = "Short Length Volume Oscillator", group="Volume")
+longlen = input.int(10, minval=1, title = "Long Length Volume Oscillator", group="Volume")
+shortx = ta.ema(volume, shortlen)
+longx = ta.ema(volume, longlen)
+osc = 100 * (shortx - longx) / longx
+
+//CMF
+var cumVol = 0.
+cumVol += nz(volume)
+if barstate.islast and cumVol == 0
+    runtime.error("No volume is provided by the data vendor.")
+length = input.int(2, minval=1, title="Length CMF", group="Volume")
+ad = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
+mf = math.sum(ad, length) / math.sum(volume, length)
+
+//SAR
+start = input.float(0.05, title="SAR Start", step=0.05, group="SAR")
+increment = input.float(0.15, title="SAR Increment", step=0.05, group="SAR")
+maximum = input.float(0.2, "SAR Max Value", step=0.05, group="SAR")
+out = ta.sar(start, increment, maximum)
+
+//HMA
+hma_fast=ta.hma(close,input.int(20, group="Hull Moving Average"))
+hma_slow=ta.hma(close,input.int(100, group="Hull Moving Average"))
+
+//HA
+ha_open=request.security(ticker.heikinashi(syminfo.tickerid),timeframe.period,open)
+ha_close=request.security(ticker.heikinashi(syminfo.tickerid),timeframe.period,close)
+
+
+//Rules
+long=close > hma_fast and hma_fast > hma_fast[1] and close>hma_slow and ha_close > ha_open and hma_fast> hma_slow and out < close  and mf>0 and osc>0
+short=close < hma_fast and hma_fast < hma_fast[1] and close<hma_slow  and ha_close < ha_open and hma_fast < hma_slow and out > close and mf<0 and osc<0
+
+stopPerS = input.float(100.0, title='LONG Stop Loss %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+takePerS = input.float(100.0, title='LONG Take Profit %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+
+
+stopPerShort = input.float(100.0, title='SHORT Stop Loss %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+takePerShort = input.float(100.0, title='SHORT Take Profit %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+
+
+if(longEntry)
+    strategy.entry("long",strategy.long,when=long)
+    strategy.close("long",when=short)
+ 
+
+
+if(shortEntry)
+    strategy.entry("short",strategy.short,when=short)
+    strategy.close("short",when=long)
+
+    
+//plot(close)
+//plot(stopPerS*close)
+//plot(close * takePerS , "TP-1.15 of close", color.blue)
+//plot( strategy.position_avg_price * 1.15, "TP-1 1.15 of posn", color.purple )
+//plot(strategy.position_avg_price*stopPerS*0.67,"SL-1" ,color.red)
+//plot(strategy.position_avg_price*stopPerS,"SL-2",color.orange)
+//plot(strategy.position_avg_price*stopPerS*1.33,"SL-3",color.green)
+
+//strategy.exit('LONG_tp/sl', 'long', profit=close * takePerS / syminfo.mintick, loss=close * stopPerS / syminfo.mintick)
+
+//strategy.exit('LONG_tp/sl-1 ',  'long', qty_percent=50,profit=close * (1 + stopPerS*2) / syminfo.mintick, loss=close * ( 1 - (stopPerS * 1.34)  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-2 ',  'long', profit=close * (1 + stopPerS*3) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 0.67 )  / syminfo.mintick))
+
+  
+// ((sl1_taken == false) and (sl2_taken == false) and (sl3_taken == false) and strategy.position_size > 0)
+//    strategy.exit('LONG_sl-1 ',  'long', qty_percent=34, loss = close * ( 1 - (stopPerS * 2)  / 3 * syminfo.mintick))
+//    sl1_taken := true
+//    sl2_taken := false
+//    sl3_taken := false
+//if  (  (sl1_taken == true) and ( sl2_taken == false )  and ( sl3_taken == false) and strategy.position_size > 0) 
+//    strategy.exit('LONG_sl-2 ',  'long', qty_percent=33,loss = close * ( 1 - (stopPerS * 3)  / 3 *  syminfo.mintick))
+//   sl2_taken := true
+//    sl1_taken := true
+//    sl3_taken := false
+//if  ( (sl1_taken == true)  and ( sl2_taken == true)  and  (sl3_taken == false) and strategy.position_size > 0)
+//    strategy.exit('LONG_sl-3 ',  'long', stop = strategy.position_avg_price * ( 1 - (stopPerS * 4)  / 3 * syminfo.mintick))
+//    sl3_taken := true
+//    sl1_taken := true
+//    sl2_taken := true
+//strategy.exit('LONG_tp/sl-1 ',  'long', profit=close * (1 + stopPerS*2.5) / syminfo.mintick)
+if  (  strategy.position_size > 0)
+    strategy.exit('LONG_tp ',  'long', profit=close * (1 + stopPerS*2.5) / syminfo.mintick)
+
+    
+//strategy.exit('LONG_tp/sl-1 ',  'long', qty_percent=34,profit=close * (1 + stopPerS*2) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 3.34)  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-2 ',  'long', qty_percent=33,profit=close * (1 + stopPerS*3) / syminfo.mintick, loss=close * ( 1 - (stopPerS *2 )  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-3 ',  'long', qty_percent=33, profit=close * (1 + stopPerS*4) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 0.67 )  / syminfo.mintick))
+
+
+strategy.exit('short_tp/sl', 'short', profit=close * takePerShort / syminfo.mintick, loss=close * stopPerShort / syminfo.mintick)
+
+// From bracket tp 
+percentAsPoints(pcnt) =>
+    strategy.position_size != 0 ? math.round((pcnt / 100 * strategy.position_avg_price / syminfo.mintick),2) : float(na)
+
+lossPnt = percentAsPoints(2)
+
+//strategy.exit("x1", qty_percent = 25, profit = percentAsPoints(1), loss = lossPnt)
+//strategy.exit("x2", qty_percent = 25, profit = percentAsPoints(2), loss = lossPnt)
+//strategy.exit("x3", qty_percent = 25, profit = percentAsPoints(3), loss = lossPnt)
+//strategy.exit("x4", profit = percentAsPoints(4), loss = lossPnt)
+
+// based on current stage set up exit
+//https://www.tradingview.com/script/jjhUHcje-Stepped-trailing-strategy-example/
+// note: we use same exit ids ("x") consciously, for MODIFY the exit's parameters
+//
+
+// @description
+//-------------------------------------------------
+// activateTrailingOnThirdStep == false (default)
+//  - when tp1 is reached, sl is moved to break-even
+//  - when tp2 is reached, sl is moved to tp1
+//  - when tp3 is reached - exit
+//-------------------------------------------------
+// activateTrailingOnThirdStep == true
+//  - when tp1 is reached, sl is moved to break-even
+//  - when tp2 is reached, sl is moved to tp1 and trailing stop is activated with tp2 amount level and tp1 offset level
+//-------------------------------------------------
+
+// exit logic    
+
+percent2points(percent) =>
+    strategy.position_avg_price * percent / 100 / syminfo.mintick
+
+// sl & tp in %%
+sl = percent2points(input(5, title = "stop loss %%", group="KRJ Bracketed Exit Stategy"))
+tp1 = percent2points(input(5, title = "take profit 1 %%", group="KRJ Bracketed Exit Stategy"))
+tp2 = percent2points(input(10, title = "take profit 2 %%", group="KRJ Bracketed Exit Stategy"))
+tp3 = percent2points(input(15, title = "take profit 3 %%", group="KRJ Bracketed Exit Stategy"))
+activateTrailingOnThirdStep = input(false, title = "activate trailing on third stage (tp3 is amount, tp2 is offset level)", group="KRJ Bracketed Exit Stategy")
+
+curProfitInPts() =>
+    if strategy.position_size > 0
+        (high - strategy.position_avg_price) / syminfo.mintick
+    else if strategy.position_size < 0
+        (strategy.position_avg_price - low) / syminfo.mintick
+    else
+        0
+        
+calcStopLossPrice(OffsetPts) =>
+    if strategy.position_size > 0
+        strategy.position_avg_price - OffsetPts * syminfo.mintick
+    else if strategy.position_size < 0
+        strategy.position_avg_price + OffsetPts * syminfo.mintick
+    else
+        na
+        
+calcProfitTrgtPrice(OffsetPts) =>
+    calcStopLossPrice(-OffsetPts)
+
+getCurrentStage() =>
+    var stage = 0
+    if strategy.position_size == 0 
+        stage := 0
+    if stage == 0 and strategy.position_size != 0
+        stage := 1
+    else if stage == 1 and curProfitInPts() >= tp1
+        stage := 2
+    else if stage == 2 and curProfitInPts() >= tp2
+        stage := 3
+    stage
+    
+    
+getCurrentSLStage() =>
+    var SLstage = 0
+    if strategy.position_size == 0 
+        SLstage := 0
+    if SLstage == 0 and strategy.position_size != 0
+        SLstage := 1
+    else if SLstage == 1 and curProfitInPts() <= sl-4
+        SLstage := 2
+    else if SLstage == 2 and curProfitInPts() <= sl+4
+        SLstage := 3
+    SLstage
+      
+
+calcTrailingAmountLevel(points) =>
+    var float level = na
+    level := calcProfitTrgtPrice(points)
+    if not na(level)
+        if strategy.position_size > 0
+            if not na(level[1])
+                level := math.max(level[1], level)
+            if not na(level)
+                level := math.max(high, level)
+        else if strategy.position_size < 0
+            if not na(level[1])
+                level := math.min(level[1], level)
+            if not na(level)
+                level := math.min(low, level)
+
+calcTrailingOffsetLevel(points, offset) =>
+    float result = na
+    amountLevel = calcTrailingAmountLevel(points)
+    if strategy.position_size > 0
+        trailActiveDiff = amountLevel - calcProfitTrgtPrice(points)
+        if trailActiveDiff > 0
+            result := trailActiveDiff + calcProfitTrgtPrice(offset)
+    else if strategy.position_size < 0
+        trailActiveDiff = calcProfitTrgtPrice(points) - amountLevel
+        if trailActiveDiff > 0
+            result := calcProfitTrgtPrice(offset) - trailActiveDiff
+    result
+
+float stopLevel = na
+float trailOffsetLevel = na
+float profitLevel = activateTrailingOnThirdStep ? calcTrailingAmountLevel(tp3) : calcProfitTrgtPrice(tp3)
+
+// note: calcTrailingOffsetLevel uses calcTrailingAmountLevel and last one has a state (level).
+//       therefor we needs calculate it on every bar for correct result.
+//       if we inline it the Pine compiler give us warning "The function '***' should be called on each calculation for consistency. It is recommended to extract the call from this scope."
+trailOffsetLevelTmp = calcTrailingOffsetLevel(tp3, tp2)
+
+// based on current stage set up exit
+// note: we use same exit ids ("x") consciously, for MODIFY the exit's parameters
+curStage = getCurrentStage()
+if curStage == 1
+    stopLevel := calcStopLossPrice(sl)
+    strategy.exit("x", loss = sl, profit = tp3, comment = "sl or tp3")
+else if curStage == 2
+    stopLevel := calcStopLossPrice(0)
+    strategy.exit("x", stop = stopLevel, profit = tp3, comment = "breakeven or tp3")
+else if curStage == 3
+    stopLevel := calcStopLossPrice(-tp1)
+    if activateTrailingOnThirdStep
+        trailOffsetLevel := trailOffsetLevelTmp
+        strategy.exit("x", stop = stopLevel, trail_points = tp3, trail_offset = tp3-tp2, comment = "stop tp1 or trailing tp3 with offset tp2")
+    else
+        strategy.exit("x", stop = stopLevel, profit = tp3, comment = "tp1 or tp3")
+else
+    strategy.cancel("x")
+    
+// based on current stage set up exit
+
+// note: we use same exit ids ("x") consciously, for MODIFY the exit's parameters
+
+curSLStage = getCurrentSLStage()
+
+if curSLStage == 1
+
+    stopLevel := calcStopLossPrice(sl)
+
+    strategy.close("long", when=close < stopLevel,qty_percent=34)
+
+    strategy.close("short", when=close > stopLevel)
+
+else if curSLStage == 2 
+
+    stopLevel := calcStopLossPrice(sl-4)
+
+    strategy.close("long", when=close < stopLevel,qty_percent=33)
+
+    strategy.close("short", when=close > stopLevel)
+
+else if curSLStage == 3
+
+    stopLevel := calcStopLossPrice(sl+4)
+
+    strategy.close("long", when=close < stopLevel)
+
+    strategy.close("short", when=close > stopLevel)
+
+else
+
+    strategy.cancel("x")
+    
+    
+    
+    
+// this is debug plots for visulalize TP & SL levels
+plot(stopLevel, style = plot.style_linebr, color = color.red)
+plot(profitLevel, style = plot.style_linebr, color = color.blue)
+plot(trailOffsetLevel, style = plot.style_linebr, color = color.green)

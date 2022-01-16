@@ -1,0 +1,160 @@
+/ This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © krajeshj
+
+// This is an intermediate  change
+// KRJ FIXME TODO : Please delete this file
+// KRJ VER 2
+//@version=5
+//strategy("My Strategy", overlay=true, margin_long=100, margin_short=100)
+//
+//longCondition = ta.crossover(ta.sma(close, 14), ta.sma(close, 28))
+//if (longCondition)
+//    strategy.entry("My Long Entry Id", strategy.long)
+
+//shortCondition = ta.crossunder(ta.sma(close, 14), ta.sma(close, 28))
+//if (shortCondition)
+//    strategy.entry("My Short Entry Id", strategy.short)
+//    */
+//@version=5
+strategy(title = "KRJ Swing HMA Volume Sar HA", overlay = true,  pyramiding=1,initial_capital = 100, default_qty_type= strategy.percent_of_equity, default_qty_value = 100, calc_on_order_fills=false, slippage=0,commission_type=strategy.commission.percent,commission_value=0.1)
+longEntry=input.bool(true,title="Allow Long entries?", group="Entry Type") 
+shortEntry=input.bool(false,title="Allow Short entries", group="Entry Type") 
+
+//uo
+var cumVolx = 0.
+cumVolx += nz(volume)
+if barstate.islast and cumVolx == 0
+    runtime.error("No volume is provided by the data vendor.")
+shortlen = input.int(5, minval=1, title = "Short Length Volume Oscillator", group="Volume")
+longlen = input.int(10, minval=1, title = "Long Length Volume Oscillator", group="Volume")
+shortx = ta.ema(volume, shortlen)
+longx = ta.ema(volume, longlen)
+osc = 100 * (shortx - longx) / longx
+
+//CMF
+var cumVol = 0.
+cumVol += nz(volume)
+if barstate.islast and cumVol == 0
+    runtime.error("No volume is provided by the data vendor.")
+length = input.int(2, minval=1, title="Length CMF", group="Volume")
+ad = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
+mf = math.sum(ad, length) / math.sum(volume, length)
+
+//SAR
+start = input.float(0.05, title="SAR Start", step=0.05, group="SAR")
+increment = input.float(0.15, title="SAR Increment", step=0.05, group="SAR")
+maximum = input.float(0.2, "SAR Max Value", step=0.05, group="SAR")
+out = ta.sar(start, increment, maximum)
+
+//HMA
+hma_fast=ta.hma(close,input.int(20, group="Hull Moving Average"))
+hma_slow=ta.hma(close,input.int(100, group="Hull Moving Average"))
+
+//HA
+ha_open=request.security(ticker.heikinashi(syminfo.tickerid),timeframe.period,open)
+ha_close=request.security(ticker.heikinashi(syminfo.tickerid),timeframe.period,close)
+
+
+//Rules
+long=close > hma_fast and hma_fast > hma_fast[1] and close>hma_slow and ha_close > ha_open and hma_fast> hma_slow and out < close  and mf>0 and osc>0
+short=close < hma_fast and hma_fast < hma_fast[1] and close<hma_slow  and ha_close < ha_open and hma_fast < hma_slow and out > close and mf<0 and osc<0
+
+stopPerS = input.float(100.0, title='LONG Stop Loss %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+takePerS = input.float(100.0, title='LONG Take Profit %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+
+
+stopPerShort = input.float(100.0, title='SHORT Stop Loss %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+takePerShort = input.float(100.0, title='SHORT Take Profit %', group='Fixed Risk Management/3 Commas TP-SL') / 100
+var  sl1_taken = false
+
+
+var  sl1_taken = false
+var  sl2_taken = false
+var  sl3_taken = false
+
+if(longEntry)
+    strategy.entry("long",strategy.long,when=long)
+    strategy.close("long",when=short)
+    sl1_taken := false
+    sl2_taken := false
+    sl3_taken := false
+
+
+if(shortEntry)
+    strategy.entry("short",strategy.short,when=short)
+    strategy.close("short",when=long)
+    sl1_taken := false
+    sl2_taken := false
+    sl3_taken := false
+    
+//plot(close)
+//plot(stopPerS*close)
+//plot(close * takePerS , "TP-1.15 of close", color.blue)
+//plot( strategy.position_avg_price * 1.15, "TP-1 1.15 of posn", color.purple )
+//plot(strategy.position_avg_price*stopPerS*0.67,"SL-1" ,color.red)
+//plot(strategy.position_avg_price*stopPerS,"SL-2",color.orange)
+//plot(strategy.position_avg_price*stopPerS*1.33,"SL-3",color.green)
+
+//strategy.exit('LONG_tp/sl', 'long', profit=close * takePerS / syminfo.mintick, loss=close * stopPerS / syminfo.mintick)
+
+//strategy.exit('LONG_tp/sl-1 ',  'long', qty_percent=50,profit=close * (1 + stopPerS*2) / syminfo.mintick, loss=close * ( 1 - (stopPerS * 1.34)  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-2 ',  'long', profit=close * (1 + stopPerS*3) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 0.67 )  / syminfo.mintick))
+
+  
+if ((sl1_taken == false) and (sl2_taken == false) and (sl3_taken == false) and strategy.position_size > 0)
+    strategy.exit('LONG_sl-1 ',  'long', qty_percent=34, stop = strategy.position_avg_price * ( 1 - (stopPerS * 2)  / 3 * syminfo.mintick))
+    sl1_taken := true
+if  (  (sl1_taken == true) and ( sl2_taken == false )  and ( sl3_taken == false) and strategy.position_size > 0) 
+    strategy.exit('LONG_sl-2 ',  'long', qty_percent=33,stop = strategy.position_avg_price * ( 1 - (stopPerS * 3)  / 3 *  syminfo.mintick))
+    sl2_taken := true
+if  ( (sl1_taken == true)  and ( sl2_taken == true)  and  (sl3_taken == false) and strategy.position_size > 0)
+    strategy.exit('LONG_sl-3 ',  'long', stop = strategy.position_avg_price * ( 1 - (stopPerS * 4)  / 3 * syminfo.mintick))
+    sl3_taken := true
+//strategy.exit('LONG_tp/sl-1 ',  'long', profit=close * (1 + stopPerS*2.5) / syminfo.mintick)
+if  (  strategy.position_size > 0)
+    strategy.exit('LONG_tp1 ',  'long', profit=close * (1 + stopPerS*2.5) / syminfo.mintick)
+
+    
+//strategy.exit('LONG_tp/sl-1 ',  'long', qty_percent=34,profit=close * (1 + stopPerS*2) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 3.34)  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-2 ',  'long', qty_percent=33,profit=close * (1 + stopPerS*3) / syminfo.mintick, loss=close * ( 1 - (stopPerS *2 )  / syminfo.mintick))
+//strategy.exit('LONG_tp/sl-3 ',  'long', qty_percent=33, profit=close * (1 + stopPerS*4) / syminfo.mintick, stop=close * ( 1 - (stopPerS * 0.67 )  / syminfo.mintick))
+
+
+strategy.exit('short_tp/sl', 'short', profit=close * takePerShort / syminfo.mintick, loss=close * stopPerShort / syminfo.mintick)
+
+
+
+
+// based on current stage set up exit
+
+// note: we use same exit ids ("x") consciously, for MODIFY the exit's parameters
+
+curStage = getCurrentStage()
+
+if curStage == 1
+
+    stopLevel := calcStopLossPrice(sl)
+
+    strategy.close("Long", when=close < stopLevel)
+
+    strategy.close("Short", when=close > stopLevel)
+
+else if curStage == 2 
+
+    stopLevel := calcStopLossPrice(0)
+
+    strategy.close("Long", when=close < stopLevel)
+
+    strategy.close("Short", when=close > stopLevel)
+
+else if curStage == 3
+
+    stopLevel := calcStopLossPrice(-tp1)
+
+    strategy.close("Long", when=close < stopLevel)
+
+    strategy.close("Short", when=close > stopLevel)
+
+else
+
+    strategy.cancel("x")
