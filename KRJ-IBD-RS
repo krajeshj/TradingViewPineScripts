@@ -1,6 +1,12 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © krajeshj
+RELATIVE STRENGTH RATING
 
+//This technical tool is one of the most popular ways for clients to see the market’s top performers. 
+//The Relative Strength Rating is the result of calculating a stock’s percentage price change over
+//the last 12 months. A 40% weight is assigned to the latest three-month period; the remaining three
+//quarters each receive 20% weight. All stocks are arranged in order of greatest price percentage
+//change and assigned a percentile rank from 99 (highest) to 1 (lowest).
 //@version=4
 
 study(title = "Relative Strength - Rate of Changes (before Rank)", shorttitle = "KRJs IBD RS", overlay = true)
