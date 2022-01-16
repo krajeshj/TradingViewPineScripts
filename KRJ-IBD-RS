@@ -1,0 +1,76 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © krajeshj
+
+//@version=4
+
+study(title = "Relative Strength - Rate of Changes (before Rank)", shorttitle = "KRJs IBD RS", overlay = true)
+// https://www.youtube.com/watch?v=CdFmuCRq2tM
+//KRJ
+spx = security("SPY", "D", close)
+src = security(syminfo.ticker,"D",close)
+
+
+RSlen = input(title = "RS Period", type = input.integer, defval = 260, minval = 1)
+maLen = input(title = "SMA Period", type = input.integer, defval = 20, minval = 1)
+
+
+n1 = round(0.25 * RSlen)
+n2 = round(0.5 * RSlen)
+n3 = round(0.75 * RSlen)
+n4 = round(RSlen)
+
+
+
+// Relative Strength 
+
+M1 = (close / close[n1] - 1)
+M2 = (close / close[n2] - 1)
+M3 = (close / close[n3] - 1)
+M4 = (close / close[n4] - 1)
+
+//KRJ
+RS1 = (src - src[n1])/(spx - spx[n1])
+RS2 = (src - src[n2])/(spx - spx[n2])
+RS3 = (src - src[n3])/(spx - spx[n3])
+RS4 = (src - src[n4])/(spx - spx[n4])
+
+kRS1 = (src / src[n1] )/(spx / spx[n1]  )
+kRS2 = (src / src[n2] )/(spx / spx[n2]  )
+kRS3 = (src / src[n3] )/(spx / spx[n3] )
+kRS4 = (src / src[n4] )/(spx / spx[n4] )
+
+
+// plotting
+colRed = #f43636
+colPur = #9c27b0
+
+
+//plot(src)
+//plot(src[n1])
+//plot (src - src[n1])
+
+//plot(spx,color=colRed)
+//plot(spx[n1],color=colRed)
+//plot ((spx - spx[n1]),color=colRed)
+//plot (spx[1])
+
+// (kRS1)
+
+ORIG_RS = 100 * (0.4 * M1 + 0.2 * (M2 + M3 + M4))
+
+// KRJ
+KRJRS = 100 * ((0.4 * RS1) + 0.2 * (RS2 + RS3 + RS4))
+RS = 100 * ((0.4 * kRS1) + 0.2 * (kRS2 + kRS3 + kRS4)) 
+
+
+maR = sma(RS, maLen)
+
+// plotting
+//colRed = #f43636
+//colPur = #9c27b0
+
+plot(RS, title = "KRJ IBD RS", color = colRed, linewidth = 1, transp = 0)
+plot(maR, title = "SMA-RS", color = colPur, linewidth = 2, transp = 0)
+hline(0, color = color.gray)
+
+
